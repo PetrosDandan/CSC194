@@ -1,0 +1,6 @@
+{
+  "name": "Iligan City Flood Evacuation Simulation",
+  "description": "A high-performance real-time flood evacuation and situational awareness simulation system for Iligan City, Philippine, utilizing Monte Carlo analysis and safe routing pathfinding.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

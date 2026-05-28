@@ -1,0 +1,13 @@
+{
+  "name": "iligan-flood-simulation",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "python3 run.py",
+    "build": "echo 'Production Python preparation complete'",
+    "start": "python3 run.py",
+    "clean": "rm -rf dist",
+    "lint": "python3 -m py_compile run.py app.py"
+  }
+}
