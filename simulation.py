@@ -15,6 +15,7 @@ import math
 import random
 import sys
 import time
+import heapq
 from typing import Dict, List, Optional, Tuple, Any
 
 # ==========================================
@@ -231,7 +232,7 @@ def find_safe_route(
 ) -> Dict[str, Any]:
     """
     Computes a dynamically weighted Dijkstra shortest path back to target safe zones,
-    factoring in water depths, bridge failures, and crowd densities.
+    factoring in water depths, bridge failures, and crowd densities using a Priority Queue.
     """
     center = next((c for c in INITIAL_EVAC_CENTERS if c["id"] == end_center_id), None)
     target_brgy_id = center["barangayId"] if center else ""
@@ -248,17 +249,19 @@ def find_safe_route(
     # Dijkstra arrays
     distances = {b["id"]: float("inf") for b in barangays}
     previous = {b["id"]: None for b in barangays}
-    queue = [b["id"] for b in barangays]
     distances[start_brgy_id] = 0.0
 
-    while len(queue) > 0:
-        queue.sort(key=lambda nid: distances[nid])
-        u = queue.pop(0)
+    pq = [(0.0, start_brgy_id)]
+    visited = set()
+
+    while len(pq) > 0:
+        current_dist, u = heapq.heappop(pq)
 
         if u == target_brgy_id:
             break
-        if distances[u] == float("inf"):
-            break
+        if u in visited:
+            continue
+        visited.add(u)
 
         # Seek roads connecting node u
         connecting_segments = [
@@ -267,25 +270,30 @@ def find_safe_route(
 
         for road in connecting_segments:
             neighbor = road["to"] if road["from"] == u else road["from"]
-            if neighbor not in queue:
+            if neighbor in visited:
                 continue
 
             prob = mc_results["roadPassabilityProb"].get(road["id"], 1.0)
             road_depth = road.get("currentDepth", 0.0)
             is_failed_bridge = state["bridgeFailure"] and road["isBridge"]
 
+            # EQUATION 1: Quadratic Depth Penalty
+            alpha = 25.0
+            beta = 50.0
             risk_penalty = 1.0
+            
             if road_depth > 0.4:
-                risk_penalty += (road_depth * 25.0)
+                risk_penalty += alpha * (road_depth ** 2)
             if prob < 0.8:
-                risk_penalty += (1.0 - prob) * 50.0
+                risk_penalty += beta * (1.0 - prob)
             if is_failed_bridge:
                 risk_penalty += 10000.0  # Impassable barrier
 
-            alt_dist = distances[u] + road["distance"] * risk_penalty
+            alt_dist = current_dist + (road["distance"] * risk_penalty)
             if alt_dist < distances[neighbor]:
                 distances[neighbor] = alt_dist
                 previous[neighbor] = u
+                heapq.heappush(pq, (alt_dist, neighbor))
 
     # Trace backward paths
     path = []
@@ -361,8 +369,8 @@ def run_discrete_hour_simulation(scenario_name: str) -> Dict[str, Any]:
     for i in range(conf["initialPopulation"]):
         source_id = random.choice(flood_prone_brgys)
         target_center = random.choice(["EC1", "EC2", "EC3", "EC5"])
-        # Give diverse personal delays (preparation time hours)
-        prep_time = round(random.random() * 2.2, 2)
+        # Give diverse personal delays (Log-Normal preparation time hours matching Section III-C)
+        prep_time = round(0.5 + random.lognormvariate(0.0, 0.5), 2)
         civilians.append({
             "id": f"CIV-{i+1:03d}",
             "sourceBarangayId": source_id,
